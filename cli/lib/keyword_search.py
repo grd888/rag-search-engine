@@ -18,11 +18,11 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
 
     return results
 
+
 def has_matching_tokens(query_tokens: list[str], title_tokens: list[str]) -> bool:
     for query_token in query_tokens:
-        for title_token in title_tokens:
-            if query_token in title_token:
-                return True
+        if query_token in title_tokens:
+            return True
     return False
 
 
@@ -31,10 +31,13 @@ def preprocess_text(text: str) -> str:
     text = text.translate(str.maketrans("", "", string.punctuation))
     return text
 
+
 def tokenize_text(text: str) -> list[str]:
     stop_words = load_stop_words()
     text = preprocess_text(text)
     tokens = text.split()
     ps = PorterStemmer()
-    valid_tokens = [ps.stem(token) for token in tokens if token and token not in stop_words]
+    valid_tokens = [
+        ps.stem(token) for token in tokens if token and token not in stop_words
+    ]
     return valid_tokens
