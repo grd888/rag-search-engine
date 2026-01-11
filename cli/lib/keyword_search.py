@@ -1,12 +1,50 @@
-from .search_utils import DEFAULT_SEARCH_LIMIT, load_movies
+import string
+from nltk.stem import PorterStemmer
+from .search_utils import DEFAULT_SEARCH_LIMIT, load_movies, load_stop_words
+
+_STOP_WORDS = None
+_STEMMER = PorterStemmer()
+
+def _get_stop_words() -> list[str]:
+    global _STOP_WORDS
+    if _STOP_WORDS is None:
+        _STOP_WORDS = load_stop_words()
+    return _STOP_WORDS
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     movies = load_movies()
     results = []
+
+    query_tokens = tokenize_text(query)
+
     for movie in movies:
-        if query in movie["title"]:
+        title_tokens = tokenize_text(movie["title"])
+        if has_matching_tokens(query_tokens, title_tokens):
             results.append(movie)
             if len(results) >= limit:
                 break
-    
-    return results 
+
+    return results
+
+
+def has_matching_tokens(query_tokens: list[str], title_tokens: list[str]) -> bool:
+    for query_token in query_tokens:
+        if query_token in title_tokens:
+            return True
+    return False
+
+
+def preprocess_text(text: str) -> str:
+    text = text.lower()
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    return text
+
+
+def tokenize_text(text: str) -> list[str]:
+    stop_words = _get_stop_words()
+    text = preprocess_text(text)
+    tokens = text.split()
+    valid_tokens = [
+        _STEMMER.stem(token) for token in tokens if token and token not in stop_words
+    ]
+    return valid_tokens
