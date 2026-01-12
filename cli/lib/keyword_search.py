@@ -77,10 +77,10 @@ def tokenize_text(text: str) -> list[str]:
 class InvertedIndex:
     def __init__(self) -> None:
         # a mapping of tokens to document IDs
-        self.index: dict[str, set[int]] = {}
+        self.index: defaultdict[str, set[int]] = defaultdict(set)
         # a mapping of document IDs to their full document objects
         self.doc_map: dict[int, dict] = {}
-        self.term_frequencies = defaultdict(Counter)
+        self.term_frequencies: defaultdict[int, Counter] = defaultdict(Counter)
 
         self.index_path = os.path.join(CACHE_DIR, "index.pkl")
         self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
@@ -92,8 +92,6 @@ class InvertedIndex:
 
         # add each token to the index with the document ID
         for token in tokens:
-            if token not in self.index:
-                self.index[token] = set()
             self.index[token].add(doc_id)
         self.term_frequencies[doc_id].update(tokens)
 
