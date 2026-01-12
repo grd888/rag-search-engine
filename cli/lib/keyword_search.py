@@ -1,6 +1,7 @@
 import string
 import os
 import pickle
+from collections import Counter, defaultdict
 from nltk.stem import PorterStemmer
 from .search_utils import DEFAULT_SEARCH_LIMIT, CACHE_DIR, load_movies, load_stop_words
 
@@ -19,6 +20,12 @@ def build_command() -> None:
     inverted_index = InvertedIndex()
     inverted_index.build()
     inverted_index.save()
+
+
+def tf_command(doc_id: int, term: str) -> int:
+    inverted_index = InvertedIndex()
+    inverted_index.load()
+    return inverted_index.get_tf(doc_id, term)
 
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
@@ -73,25 +80,41 @@ class InvertedIndex:
         self.index: dict[str, set[int]] = {}
         # a mapping of document IDs to their full document objects
         self.doc_map: dict[int, dict] = {}
+        self.term_frequencies = defaultdict(Counter)
 
         self.index_path = os.path.join(CACHE_DIR, "index.pkl")
         self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
+        self.term_frequencies_path = os.path.join(CACHE_DIR, "term_frequencies.pkl")
 
     def _add_document(self, doc_id: int, text: str):
         # tokenize the document text
         tokens = tokenize_text(text)
+
         # add each token to the index with the document ID
         for token in tokens:
             if token not in self.index:
                 self.index[token] = set()
             self.index[token].add(doc_id)
+        self.term_frequencies[doc_id].update(tokens)
 
     def get_documents(self, term: str) -> list[int]:
         """
         Get the set of document IDs for a given term, and return them as a list,
         sorted in ascending order. (Assume input is a single word/token)
         """
-        return sorted(list(self.index.get(term, set())))
+        term_tokens = tokenize_text(term)
+        if len(term_tokens) > 1:
+            raise ValueError("Input must be a single word/token")
+        return sorted(list(self.index.get(term_tokens[0], set())))
+
+    def get_tf(self, doc_id: int, term: str) -> int:
+        """
+        Get the term frequency for a given document and term.
+        """
+        term_tokens = tokenize_text(term)
+        if len(term_tokens) > 1:
+            raise ValueError("Input must be a single word/token")
+        return self.term_frequencies[doc_id][term_tokens[0]]
 
     def build(self) -> None:
         """
@@ -112,6 +135,8 @@ class InvertedIndex:
             pickle.dump(self.index, f)
         with open(self.docmap_path, "wb") as f:
             pickle.dump(self.doc_map, f)
+        with open(self.term_frequencies_path, "wb") as f:
+            pickle.dump(self.term_frequencies, f)
 
     def load(self) -> None:
         if not os.path.exists(self.index_path):
@@ -122,3 +147,5 @@ class InvertedIndex:
             self.index = pickle.load(f)
         with open(self.docmap_path, "rb") as f:
             self.doc_map = pickle.load(f)
+        with open(self.term_frequencies_path, "rb") as f:
+            self.term_frequencies = pickle.load(f)
