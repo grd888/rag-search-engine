@@ -19,20 +19,25 @@ def build_command() -> None:
     inverted_index = InvertedIndex()
     inverted_index.build()
     inverted_index.save()
-    docs = inverted_index.get_documents("merida")
-    print(f"First document for token 'merida' = {docs[0]}")
 
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
-    movies = load_movies()
-    results = []
+    idx = InvertedIndex()
+    try:
+        idx.load()
+    except FileNotFoundError:
+        print("Inverted index not found. Please run 'build' command first.")
+        exit(1)
+    seen, results = set(), []
 
     query_tokens = tokenize_text(query)
 
-    for movie in movies:
-        title_tokens = tokenize_text(movie["title"])
-        if has_matching_tokens(query_tokens, title_tokens):
-            results.append(movie)
+    for token in query_tokens:
+        doc_ids = idx.get_documents(token)
+        for doc_id in doc_ids:
+            if doc_id not in seen:
+                results.append(idx.doc_map[doc_id])
+                seen.add(doc_id)
             if len(results) >= limit:
                 break
 
@@ -88,7 +93,7 @@ class InvertedIndex:
         """
         return sorted(list(self.index.get(term, set())))
 
-    def build(self):
+    def build(self) -> None:
         """
         Build the inverted index from the documents in the dataset.
         """
@@ -98,7 +103,7 @@ class InvertedIndex:
             self._add_document(movie["id"], f"{movie['title']} {movie['description']}")
             self.doc_map[movie["id"]] = movie
 
-    def save(self):
+    def save(self) -> None:
         """
         Save the inverted index to a file.
         """
@@ -107,3 +112,13 @@ class InvertedIndex:
             pickle.dump(self.index, f)
         with open(self.docmap_path, "wb") as f:
             pickle.dump(self.doc_map, f)
+
+    def load(self) -> None:
+        if not os.path.exists(self.index_path):
+            raise FileNotFoundError(f"Index file not found: {self.index_path}")
+        if not os.path.exists(self.docmap_path):
+            raise FileNotFoundError(f"Document map file not found: {self.docmap_path}")
+        with open(self.index_path, "rb") as f:
+            self.index = pickle.load(f)
+        with open(self.docmap_path, "rb") as f:
+            self.doc_map = pickle.load(f)
