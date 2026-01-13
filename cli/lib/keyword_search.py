@@ -3,7 +3,6 @@ import os
 import pickle
 import math
 from collections import Counter, defaultdict
-import token
 from nltk.stem import PorterStemmer
 from .search_utils import DEFAULT_SEARCH_LIMIT, CACHE_DIR, load_movies, load_stop_words
 
@@ -33,6 +32,12 @@ def idf_command(term: str) -> float:
     inverted_index = InvertedIndex()
     inverted_index.load()
     return inverted_index.get_idf(term)
+
+def tf_idf_command(doc_id: int, term: str) -> float:
+    inverted_index = InvertedIndex()
+    inverted_index.load()
+    return inverted_index.get_tf_idf(doc_id, term)
+
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     idx = InvertedIndex()
     try:
@@ -123,10 +128,16 @@ class InvertedIndex:
         tokens = tokenize_text(term)
         if len(tokens) != 1:
             raise ValueError("Input must be a single word/token")
-        term_token = tokens[0]
+        token = tokens[0]
         total_doc_count = len(self.doc_map)
-        term_match_doc_count = len(self.index[term_token])
+        term_match_doc_count = len(self.index[token])
         return math.log((total_doc_count + 1) / (term_match_doc_count + 1))
+
+    def get_tf_idf(self, doc_id: int, term: str) -> float:
+        """
+        Get the term frequency-inverse document frequency for a given document and term.
+        """
+        return self.get_tf(doc_id, term) * self.get_idf(term)
 
     def build(self) -> None:
         """
