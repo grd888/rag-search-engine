@@ -38,6 +38,11 @@ def tf_idf_command(doc_id: int, term: str) -> float:
     inverted_index.load()
     return inverted_index.get_tf_idf(doc_id, term)
 
+def bm25_idf_command(term: str) -> float:
+    inverted_index = InvertedIndex()
+    inverted_index.load()
+    return inverted_index.get_bm25_idf(term)
+
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     idx = InvertedIndex()
     try:
@@ -139,6 +144,20 @@ class InvertedIndex:
         """
         return self.get_tf(doc_id, term) * self.get_idf(term)
 
+    def get_bm25_idf(self, term: str) -> float:
+        """
+        Get the BM25 score for a given document and term.
+        """
+        tokens = tokenize_text(term)
+        if len(tokens) != 1:
+            raise ValueError("Input must be a single word/token")
+        token = tokens[0]
+        # N = total number of documents
+        N = len(self.doc_map)
+        # df = document frequency of term
+        df = len(self.index[token])
+        # bm25_idf = log((N - df + 0.5) / (df + 0.5) + 1)
+        return math.log((N - df + 0.5) / (df + 0.5) + 1)
     def build(self) -> None:
         """
         Build the inverted index from the documents in the dataset.
