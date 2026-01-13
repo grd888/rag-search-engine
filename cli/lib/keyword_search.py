@@ -8,6 +8,7 @@ from .search_utils import (
     DEFAULT_SEARCH_LIMIT,
     CACHE_DIR,
     BM25_K1,
+    BM25_B,
     load_movies,
     load_stop_words,
 )
@@ -52,10 +53,10 @@ def bm25_idf_command(term: str) -> float:
     inverted_index.load()
     return inverted_index.get_bm25_idf(term)
 
-def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1) -> float:
+def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1, b: float = BM25_B) -> float:
     inverted_index = InvertedIndex()
     inverted_index.load()
-    return inverted_index.get_bm25_tf(doc_id, term, k1)
+    return inverted_index.get_bm25_tf(doc_id, term, k1, b)
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     idx = InvertedIndex()
@@ -110,12 +111,15 @@ class InvertedIndex:
         # a mapping of document IDs to their full document objects
         self.doc_map: dict[int, dict] = {}
         self.term_frequencies: defaultdict[int, Counter] = defaultdict(Counter)
+        # a mapping of document IDs to their length (number of tokens)
+        self.doc_lengths: defaultdict[int, int] = defaultdict(int)
 
         self.index_path = os.path.join(CACHE_DIR, "index.pkl")
         self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
         self.term_frequencies_path = os.path.join(CACHE_DIR, "term_frequencies.pkl")
+        self.doc_lengths_path = os.path.join(CACHE_DIR, "doc_lengths.pkl")
 
-    def _add_document(self, doc_id: int, text: str):
+    def __add_document(self, doc_id: int, text: str):
         # tokenize the document text
         tokens = tokenize_text(text)
 
@@ -123,6 +127,12 @@ class InvertedIndex:
         for token in tokens:
             self.index[token].add(doc_id)
         self.term_frequencies[doc_id].update(tokens)
+        self.doc_lengths[doc_id] = len(tokens)
+        
+    def __get_avg_doc_length(self) -> float:
+        if not self.doc_lengths or len(self.doc_lengths) == 0:
+            return 0.0
+        return sum(self.doc_lengths.values()) / len(self.doc_lengths)
 
     def get_documents(self, term: str) -> list[int]:
         """
@@ -173,13 +183,19 @@ class InvertedIndex:
         # bm25_idf = log((N - df + 0.5) / (df + 0.5) + 1)
         return math.log((N - df + 0.5) / (df + 0.5) + 1)
 
-    def get_bm25_tf(self, doc_id: int, term: str, k1: float=BM25_K1) -> float:
+    def get_bm25_tf(self, doc_id: int, term: str, k1: float=BM25_K1, b: float=BM25_B) -> float:
         """
         Get the BM25 score for a given document and term.
         """
         tf = self.get_tf(doc_id, term)
+        avg_doc_length = self.__get_avg_doc_length()
+        # Length normalization factor
+        if avg_doc_length > 0:
+            length_norm = (1 - b + b * (self.doc_lengths[doc_id] / avg_doc_length))
+        else:
+            length_norm = 1
         # Saturation formula: (tf * (k1 + 1)) / (tf + k1)
-        return (tf * (k1 + 1)) / (tf + k1)
+        return (tf * (k1 + 1)) / (tf + k1 * length_norm)
 
     def build(self) -> None:
         """
@@ -188,7 +204,7 @@ class InvertedIndex:
         movies = load_movies()
         for movie in movies:
             # concatenate the title and description
-            self._add_document(movie["id"], f"{movie['title']} {movie['description']}")
+            self.__add_document(movie["id"], f"{movie['title']} {movie['description']}")
             self.doc_map[movie["id"]] = movie
 
     def save(self) -> None:
@@ -202,15 +218,24 @@ class InvertedIndex:
             pickle.dump(self.doc_map, f)
         with open(self.term_frequencies_path, "wb") as f:
             pickle.dump(self.term_frequencies, f)
+        with open(self.doc_lengths_path, "wb") as f:
+            pickle.dump(self.doc_lengths, f)
 
     def load(self) -> None:
         if not os.path.exists(self.index_path):
             raise FileNotFoundError(f"Index file not found: {self.index_path}")
         if not os.path.exists(self.docmap_path):
             raise FileNotFoundError(f"Document map file not found: {self.docmap_path}")
+        if not os.path.exists(self.term_frequencies_path):
+            raise FileNotFoundError(f"Term frequencies file not found: {self.term_frequencies_path}")
+        if not os.path.exists(self.doc_lengths_path):
+            raise FileNotFoundError(f"Document lengths file not found: {self.doc_lengths_path}")
+        
         with open(self.index_path, "rb") as f:
             self.index = pickle.load(f)
         with open(self.docmap_path, "rb") as f:
             self.doc_map = pickle.load(f)
         with open(self.term_frequencies_path, "rb") as f:
             self.term_frequencies = pickle.load(f)
+        with open(self.doc_lengths_path, "rb") as f:
+            self.doc_lengths = pickle.load(f)
