@@ -24,6 +24,13 @@ def verify_embeddings() -> None:
   print(f"Number of docs:   {len(documents)}")
   print(f"Embeddings shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions")
 
+def embed_query_text(query: str) -> None:
+  semantic_search = SemanticSearch()
+  embedding = semantic_search.generate_embedding(query)
+  print(f"Query: {query}")
+  print(f"First 5 dimensions: {embedding[:5]}")
+  print(f"Shape: {embedding.shape}")
+
 class SemanticSearch:
     def __init__(self) -> None:
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -38,7 +45,7 @@ class SemanticSearch:
         raise ValueError("Input text cannot be empty or contain only whitespace")
       
       # generate and return the embedding
-      embeddings = self.model.encode([text])
+      embeddings = self.model.encode([text.strip()])
       return embeddings[0]
     
     def build_embeddings(self, documents: list[dict]):
