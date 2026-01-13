@@ -9,6 +9,7 @@ from .search_utils import (
     CACHE_DIR,
     BM25_K1,
     BM25_B,
+    format_search_result,
     load_movies,
     load_stop_words,
 )
@@ -80,6 +81,10 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
 
     return results
 
+def bm25_search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
+    inverted_index = InvertedIndex()
+    inverted_index.load()
+    return inverted_index.bm25_search(query, limit)
 
 def has_matching_tokens(query_tokens: list[str], title_tokens: list[str]) -> bool:
     for query_token in query_tokens:
@@ -196,6 +201,44 @@ class InvertedIndex:
             length_norm = 1
         # Saturation formula: (tf * (k1 + 1)) / (tf + k1)
         return (tf * (k1 + 1)) / (tf + k1 * length_norm)
+    
+    def bm25(self, doc_id: int, term: str) -> float:
+        """
+        Get the BM25 score for a given document and term.
+        """
+        bm25_idf = self.get_bm25_idf(term) 
+        bm25_tf = self.get_bm25_tf(doc_id, term)
+        return bm25_idf * bm25_tf
+    
+    def bm25_search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[int]:
+        """
+        Search for documents using BM25.
+        """
+        tokens = tokenize_text(query)
+        # maps document id to total BM25 score
+        scores_dict: dict[int: int] = {}
+        for doc_id in self.doc_map:
+            score = 0.0
+            for token in tokens:
+                score += self.bm25(doc_id, token)
+            scores_dict[doc_id] = score
+        
+        # sort the documents by score in descending order
+        sorted_docs = sorted(scores_dict.items(), key=lambda x: x[1], reverse=True)
+        
+        results = []
+        for doc_id, score in sorted_docs[:limit]:
+            doc = self.doc_map[doc_id]
+            formatted_result = format_search_result(
+                doc_id=doc["id"],
+                title=doc["title"],
+                document = doc["description"],
+                score=score
+            )
+            results.append(formatted_result)
+        
+        return results
+        
 
     def build(self) -> None:
         """
