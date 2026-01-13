@@ -4,7 +4,13 @@ import pickle
 import math
 from collections import Counter, defaultdict
 from nltk.stem import PorterStemmer
-from .search_utils import DEFAULT_SEARCH_LIMIT, CACHE_DIR, load_movies, load_stop_words
+from .search_utils import (
+    DEFAULT_SEARCH_LIMIT,
+    CACHE_DIR,
+    BM25_K1,
+    load_movies,
+    load_stop_words,
+)
 
 _STOP_WORDS = None
 _STEMMER = PorterStemmer()
@@ -28,20 +34,28 @@ def tf_command(doc_id: int, term: str) -> int:
     inverted_index.load()
     return inverted_index.get_tf(doc_id, term)
 
+
 def idf_command(term: str) -> float:
     inverted_index = InvertedIndex()
     inverted_index.load()
     return inverted_index.get_idf(term)
+
 
 def tf_idf_command(doc_id: int, term: str) -> float:
     inverted_index = InvertedIndex()
     inverted_index.load()
     return inverted_index.get_tf_idf(doc_id, term)
 
+
 def bm25_idf_command(term: str) -> float:
     inverted_index = InvertedIndex()
     inverted_index.load()
     return inverted_index.get_bm25_idf(term)
+
+def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1) -> float:
+    inverted_index = InvertedIndex()
+    inverted_index.load()
+    return inverted_index.get_bm25_tf(doc_id, term, k1)
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     idx = InvertedIndex()
@@ -128,7 +142,7 @@ class InvertedIndex:
         if len(term_tokens) > 1:
             raise ValueError("Input must be a single word/token")
         return self.term_frequencies[doc_id][term_tokens[0]]
-    
+
     def get_idf(self, term: str) -> float:
         tokens = tokenize_text(term)
         if len(tokens) != 1:
@@ -158,6 +172,15 @@ class InvertedIndex:
         df = len(self.index[token])
         # bm25_idf = log((N - df + 0.5) / (df + 0.5) + 1)
         return math.log((N - df + 0.5) / (df + 0.5) + 1)
+
+    def get_bm25_tf(self, doc_id: int, term: str, k1: float=BM25_K1) -> float:
+        """
+        Get the BM25 score for a given document and term.
+        """
+        tf = self.get_tf(doc_id, term)
+        # Saturation formula: (tf * (k1 + 1)) / (tf + k1)
+        return (tf * (k1 + 1)) / (tf + k1)
+
     def build(self) -> None:
         """
         Build the inverted index from the documents in the dataset.
