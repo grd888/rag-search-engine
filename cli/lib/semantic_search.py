@@ -4,9 +4,11 @@ from .search_utils import (
     CACHE_DIR,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_SEMANTIC_CHUNK_SIZE,
     load_movies,
 )
 import os
+import re
 
 MOVIE_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "movie_embeddings.npy")
 
@@ -95,6 +97,37 @@ def chunk_text(
     for i in range(0, len(words), chunk_size - overlap):
         chunks.append(" ".join(words[i : i + chunk_size]))
     return chunks
+
+
+def semantick_chunk(
+    text: str,
+    max_chunk_size: int = DEFAULT_SEMANTIC_CHUNK_SIZE,
+    overlap: int = DEFAULT_CHUNK_OVERLAP,
+) -> list[str]:
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    chunks = []
+    current_chunk = []
+    # Each chunk should contain up to max_chunk_size sentences
+    # Support overlap by number of sentences
+    # Return a list of chunk strings
+    
+    for i in range(0, len(sentences), max_chunk_size - overlap):
+        current_chunk = sentences[i : i + max_chunk_size]
+        chunks.append(" ".join(current_chunk))
+        
+    return chunks
+    # for sentence in sentences:
+    #     # Each chunk should contain up to max_chunk_size sentences
+    #     if len(current_chunk) < max_chunk_size:
+    #         current_chunk.append(sentence)
+    #     else:
+    #         chunks.append(" ".join(current_chunk))
+    #         current_chunk = [sentence]
+    
+    # if current_chunk:
+    #     chunks.append(current_chunk.strip())
+    
+    # return chunks
 
 
 class SemanticSearch:
