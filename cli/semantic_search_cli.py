@@ -37,6 +37,7 @@ def main():
     chunk_parser = subparsers.add_parser("chunk", help="Chunk text")
     chunk_parser.add_argument("text", type=str, help="Text to chunk")
     chunk_parser.add_argument("--chunk-size", type=int, default=200, help="Chunk size")
+    chunk_parser.add_argument("--overlap", type=int, default=0, help="Overlap between chunks")
     
     args = parser.parse_args()
 
@@ -53,7 +54,7 @@ def main():
             search_command(args.query, args.limit)
         case "chunk":
             print(f"Chunking {len(args.text)} characters")
-            chunks = chunk_text(args.text, args.chunk_size)
+            chunks = chunk_text(args.text, args.chunk_size, args.overlap)
             for i, chunk in enumerate(chunks):
                 print(f"{i+1}. {chunk}")
         case _:

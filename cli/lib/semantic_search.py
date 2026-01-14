@@ -1,6 +1,11 @@
 import numpy as np
 from sentence_transformers import SentenceTransformer
-from .search_utils import CACHE_DIR, load_movies
+from .search_utils import (
+    CACHE_DIR,
+    DEFAULT_CHUNK_SIZE,
+    DEFAULT_CHUNK_OVERLAP,
+    load_movies,
+)
 import os
 
 MOVIE_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "movie_embeddings.npy")
@@ -48,6 +53,7 @@ def cosine_similarity(vec1, vec2):
 
     return dot_product / (norm1 * norm2)
 
+
 def search_command(query: str, limit: int) -> None:
     semantic_search = SemanticSearch()
     movies = load_movies()
@@ -64,17 +70,33 @@ def search_command(query: str, limit: int) -> None:
     for i, result in enumerate(results, 1):
         print(f"{i}. \t{result['title']} (score: {result['score']})")
         # truncate description to 100 characters and add trailing ellipsis
-        print("\t" + (result['description'][:100] + "..." if len(result['description']) > 100 else result['description']))
+        print(
+            "\t"
+            + (
+                result["description"][:100] + "..."
+                if len(result["description"]) > 100
+                else result["description"]
+            )
+        )
         print()
 
-def chunk_text(text: str, chunk_size: int) -> None:
+
+def chunk_text(
+    text: str,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    overlap: int = DEFAULT_CHUNK_OVERLAP,
+) -> list[str]:
     words = text.split()
     chunks = []
-    for i in range(0, len(words), chunk_size):
-        chunks.append(" ".join(words[i:i+chunk_size]))
+    # When overlap is greater than zero, each previous chunk should share the last overlap words with the following chunk.
+    # For example, if the text is "The quick brown fox jumps over the lazy dog" and the chunk size is 5 and the overlap is 2,
+    # the chunks should be ["The quick brown fox jumps", "fox jumps over the lazy", "over the lazy dog"]
+
+    for i in range(0, len(words), chunk_size - overlap):
+        chunks.append(" ".join(words[i : i + chunk_size]))
     return chunks
-    
-    
+
+
 class SemanticSearch:
     def __init__(self) -> None:
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -127,7 +149,7 @@ class SemanticSearch:
             raise ValueError(
                 "No documents loaded. Call `load_or_create_embeddings` first."
             )
-        
+
         query_embedding = self.generate_embedding(query)
         # Create a list of (similarity_score, document) tuples.
 
