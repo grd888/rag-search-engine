@@ -109,25 +109,12 @@ def semantick_chunk(
     current_chunk = []
     # Each chunk should contain up to max_chunk_size sentences
     # Support overlap by number of sentences
-    # Return a list of chunk strings
     
     for i in range(0, len(sentences), max_chunk_size - overlap):
         current_chunk = sentences[i : i + max_chunk_size]
         chunks.append(" ".join(current_chunk))
         
     return chunks
-    # for sentence in sentences:
-    #     # Each chunk should contain up to max_chunk_size sentences
-    #     if len(current_chunk) < max_chunk_size:
-    #         current_chunk.append(sentence)
-    #     else:
-    #         chunks.append(" ".join(current_chunk))
-    #         current_chunk = [sentence]
-    
-    # if current_chunk:
-    #     chunks.append(current_chunk.strip())
-    
-    # return chunks
 
 
 class SemanticSearch:
