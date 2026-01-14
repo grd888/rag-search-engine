@@ -67,6 +67,14 @@ def search_command(query: str, limit: int) -> None:
         print("\t" + (result['description'][:100] + "..." if len(result['description']) > 100 else result['description']))
         print()
 
+def chunk_text(text: str, chunk_size: int) -> None:
+    words = text.split()
+    chunks = []
+    for i in range(0, len(words), chunk_size):
+        chunks.append(" ".join(words[i:i+chunk_size]))
+    return chunks
+    
+    
 class SemanticSearch:
     def __init__(self) -> None:
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -119,7 +127,7 @@ class SemanticSearch:
             raise ValueError(
                 "No documents loaded. Call `load_or_create_embeddings` first."
             )
-            
+        
         query_embedding = self.generate_embedding(query)
         # Create a list of (similarity_score, document) tuples.
 
