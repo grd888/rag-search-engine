@@ -109,7 +109,14 @@ def semantic_chunk(
     max_chunk_size: int = DEFAULT_SEMANTIC_CHUNK_SIZE,
     overlap: int = DEFAULT_CHUNK_OVERLAP,
 ) -> list[str]:
-    sentences = re.split(r"(?<=[.!?])\s+", text)
+    if not text.strip():
+        return []
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    sentences = [s.strip() for s in sentences if s.strip()]  # Remove empty strings
+    if len(sentences) == 1 and not text.endswith((".", "!", "?")):
+        sentences = [text]
+    if len(sentences) == 0:
+        return []
     chunks = []
     current_chunk = []
     # Each chunk should contain up to max_chunk_size sentences
