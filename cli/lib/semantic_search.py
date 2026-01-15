@@ -5,7 +5,9 @@ from .search_utils import (
     CACHE_DIR,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_SEARCH_LIMIT,
     DEFAULT_SEMANTIC_CHUNK_SIZE,
+    DOCUMENT_PREVIEW_LENGTH,
     load_movies,
 )
 import os
@@ -48,7 +50,7 @@ def embed_query_text(query: str) -> None:
     print(f"Shape: {embedding.shape}")
 
 
-def cosine_similarity(vec1, vec2):
+def cosine_similarity(vec1, vec2) -> float:
     dot_product = np.dot(vec1, vec2)
     norm1 = np.linalg.norm(vec1)
     norm2 = np.linalg.norm(vec2)
@@ -126,6 +128,12 @@ def embed_chunks_command():
     embeddings = chunked_semantic_search.load_or_create_chunk_embeddings(movies)
     print(f"Generated {len(embeddings)} chunked embeddings")
 
+def search_chunks_command(query: str, limit: int) -> dict:
+    movies = load_movies()
+    chunked_semantic_search = ChunkedSemanticSearch()
+    chunked_semantic_search.load_or_create_chunk_embeddings(movies)
+    results = chunked_semantic_search.search_chunks(query, limit)
+    return {"query": query, "results": results}
 
 class SemanticSearch:
     def __init__(self, model_name="all-MiniLM-L6-v2") -> None:
@@ -136,7 +144,6 @@ class SemanticSearch:
 
     def generate_embedding(self, text: str):
         # if input text is empty or contains only whitespace, raise a ValueError
-
         if not text or not text.strip():
             raise ValueError("Input text cannot be empty or contain only whitespace")
 
@@ -170,7 +177,7 @@ class SemanticSearch:
         # if not, build embeddings
         return self.build_embeddings(documents)
 
-    def search(self, query: str, k: int = 5):
+    def search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT):
         if self.embeddings is None:
             raise ValueError(
                 "Embeddings not loaded. Call load_or_create_embeddings first."
@@ -196,7 +203,7 @@ class SemanticSearch:
           title: The movie title
           description: The movie description
         """
-        top_k_pairs = similarity_document_pairs[:k]
+        top_k_pairs = similarity_document_pairs[:limit]
         return [
             {"score": score, "title": doc["title"], "description": doc["description"]}
             for score, doc in top_k_pairs
@@ -217,12 +224,12 @@ class ChunkedSemanticSearch(SemanticSearch):
 
         all_chunks: list[str] = []
         chunk_metadata: list[dict] = []
-        
+
         for idx, doc in enumerate(documents):
             text = doc.get("description", "")
             if not text.strip():
                 continue
-            
+
             chunks = semantic_chunk(
                 text,
                 max_chunk_size=DEFAULT_SEMANTIC_CHUNK_SIZE,
@@ -262,3 +269,49 @@ class ChunkedSemanticSearch(SemanticSearch):
                 self.chunk_metadata = data["chunks"]
             return self.chunk_embeddings
         return self.build_chunk_embeddings(documents)
+
+    def search_chunks(self, query: str, limit: int = 10) -> list[dict]:
+        if self.chunk_embeddings is None or self.chunk_metadata is None:
+            raise ValueError(
+                "No chunk embeddings loaded. Call load_or_create_chunk_embeddings first."
+            )
+        # Generate embedding for the query
+        query_embedding = self.generate_embedding(query)
+        
+        # List of dictionaries containing chunk index, movie index, and score
+        chunk_scores:list[dict] = []
+        for i, chunk_embedding in enumerate(self.chunk_embeddings):
+            score = cosine_similarity(
+                query_embedding, chunk_embedding
+            )
+            chunk_scores.append({
+                "chunk_idx": i,
+                "movie_idx": self.chunk_metadata[i]["movie_idx"],
+                "score": score
+            })
+            
+        # Dictionary mapping movie indexes to their scores
+        movie_scores: dict[int, float] = {}
+        for chunk_score in chunk_scores:
+            movie_idx = chunk_score["movie_idx"]
+            score = chunk_score["score"]
+            # if the movie_idx is not in the movie score dictionary yet, 
+            # or the new score is higher than the existing one, 
+            # update the movie score dictionary with the new chunk score
+            if movie_idx not in movie_scores or score > movie_scores[movie_idx]:
+                movie_scores[movie_idx] = score
+                
+        # Sort movies by score in descending order and return the top k
+        sorted_movies = sorted(movie_scores.items(), key=lambda x: x[1], reverse=True)
+        
+        results = []
+        for movie_idx, score in sorted_movies[:limit]:
+            doc = self.documents[movie_idx]
+            results.append({
+                "id": doc["id"],
+                "title": doc["title"],
+                "document": doc["description"][:DOCUMENT_PREVIEW_LENGTH],
+                "score": round(score, 4),
+            })
+        return results
+            

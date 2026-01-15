@@ -9,7 +9,8 @@ from lib.semantic_search import (
     search_command,
     chunk_text,
     semantic_chunk,
-    embed_chunks_command
+    embed_chunks_command,
+    search_chunks_command
 )
 
 
@@ -46,6 +47,10 @@ def main():
     semantic_chunk_parser.add_argument("--max-chunk-size", type=int, default=4, help="Maximum chunk size")
     semantic_chunk_parser.add_argument("--overlap", type=int, default=0, help="Overlap between chunks")
     
+    search_chunks_parser = subparsers.add_parser("search_chunked", help="Search for chunks")
+    search_chunks_parser.add_argument("query", type=str, help="Query to search for")
+    search_chunks_parser.add_argument("--limit", type=int, default=5, help="Number of results to return")
+    
     subparsers.add_parser("embed_chunks", help="Embed chunks")
     args = parser.parse_args()
 
@@ -72,6 +77,13 @@ def main():
                 print(f"{i+1}. {chunk}")
         case "embed_chunks":
             embed_chunks_command()
+        case "search_chunked":
+            result = search_chunks_command(args.query, args.limit)
+            print(f"Query: {result['query']}")
+            print("Results:")
+            for i, res in enumerate(result["results"], 1):
+                print(f"\n{i}. {res['title']} (score: {res['score']:.4f})")
+                print(f"   {res['document']}...")
         case _:
             parser.print_help()
 
