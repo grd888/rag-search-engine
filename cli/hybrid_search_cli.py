@@ -57,15 +57,23 @@ def main() -> None:
             for score in normalized_scores:
                 print(f"* {score:.4f}")
         case "weighted-search":
-            results = weighted_search_command(args.query, args.alpha, args.limit)
-            # print(results[0])
-            for i, result in enumerate(results):
-                print(f"{i + 1}. \t{result['document']['title']}")
-                print(f"\tHybrid Score: {result['hybrid_score']:.3f}")
-                print(
-                    f"\tBM25: {result['bm25_score']:.3f}, Semantic: {result['semantic_score']:.3f}"
-                )
-                print(f"{result['document']['document'][:100]}...")
+            result = weighted_search_command(args.query, args.alpha, args.limit)
+
+            print(
+                f"Weighted Hybrid Search Results for '{result['query']}' (alpha={result['alpha']}):"
+            )
+            print(
+                f"  Alpha {result['alpha']}: {int(result['alpha'] * 100)}% Keyword, {int((1 - result['alpha']) * 100)}% Semantic"
+            )
+            for i, res in enumerate(result["results"], 1):
+                print(f"{i}. {res['title']}")
+                print(f"   Hybrid Score: {res.get('score', 0):.3f}")
+                metadata = res.get("metadata", {})
+                if "bm25_score" in metadata and "semantic_score" in metadata:
+                    print(
+                        f"   BM25: {metadata['bm25_score']:.3f}, Semantic: {metadata['semantic_score']:.3f}"
+                    )
+                print(f"   {res['document'][:100]}...")
                 print()
         case "rrf-search":
             result = rrf_search_command(
