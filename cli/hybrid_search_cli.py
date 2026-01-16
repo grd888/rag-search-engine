@@ -1,5 +1,9 @@
 import argparse
-from lib.hybrid_search import normalize_scores, weighted_search_command
+from lib.hybrid_search import (
+    normalize_scores,
+    weighted_search_command,
+    rrf_search_command,
+)
 
 
 def main() -> None:
@@ -19,6 +23,12 @@ def main() -> None:
         "--alpha", type=float, default=0.5, help="Alpha value"
     )
     weighted_search_parser.add_argument("--limit", type=int, default=5, help="Limit")
+    
+    rrf_search_parser = subparsers.add_parser("rrf-search", help="RRF search command")
+    rrf_search_parser.add_argument("query", type=str, help="Query to search")
+    rrf_search_parser.add_argument("--k", type=int, default=60, help="K value")
+    rrf_search_parser.add_argument("--limit", type=int, default=5, help="Limit")
+    
     args = parser.parse_args()
 
     match args.command:
@@ -28,7 +38,7 @@ def main() -> None:
                 print(f"* {score:.4f}")
         case "weighted-search":
             results = weighted_search_command(args.query, args.alpha, args.limit)
-            #print(results[0])
+            # print(results[0])
             for i, result in enumerate(results):
                 print(f"{i + 1}. \t{result['document']['title']}")
                 print(f"\tHybrid Score: {result['hybrid_score']:.3f}")
@@ -36,6 +46,16 @@ def main() -> None:
                     f"\tBM25: {result['bm25_score']:.3f}, Semantic: {result['semantic_score']:.3f}"
                 )
                 print(f"{result['document']['document'][:100]}...")
+                print()
+        case "rrf-search":
+            results = rrf_search_command(args.query, args.k, args.limit)
+            for i, result in enumerate(results):
+                print(f"{i + 1}. \t{result['document']['title']}")
+                print(f"\tRRF Score: {result['rrf_score']:.3f}")
+                print(
+                    f"\tBM25 Rank: {result['bm25_rank']:.3f}, Semantic Rank: {result['semantic_rank']:.3f}"
+                )
+                print(f"\t{result['document']['document'][:100]}...")
                 print()
         case _:
             parser.print_help()

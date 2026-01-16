@@ -50,8 +50,35 @@ class HybridSearch:
         return sorted(normalized_results.values(), key=lambda x: x["hybrid_score"], reverse=True)[:limit]
 
     def rrf_search(self, query, k, limit=10):
-        raise NotImplementedError("RRF hybrid search is not implemented yet.")
-
+        bm25_results = self._bm25_search(query, limit * 500)
+        semantic_results = self.semantic_search.search_chunks(query, limit * 500)
+        # Create a dictionary mapping document IDs to the documents themselves and their BM25 and semantic ranks (not scores).
+        ranks = {}
+        for i, result in enumerate(bm25_results):
+            doc_id = result["id"]
+            ranks[doc_id] = {
+                "document": result,
+                "bm25_rank": i + 1,
+                "semantic_rank": limit * 500,
+            }
+            
+        for i, result in enumerate(semantic_results):
+            doc_id = result["id"]
+            if doc_id in ranks:
+                ranks[doc_id]["semantic_rank"] = i + 1
+            else:
+                ranks[doc_id] = {
+                    "document": result,
+                    "bm25_rank": limit * 500,
+                    "semantic_rank": i + 1,
+                }
+        
+        for doc_id, rank in ranks.items():
+            rank["rrf_score"] = rrf_score(rank["bm25_rank"], k) + rrf_score(rank["semantic_rank"], k)
+        
+        return sorted(ranks.values(), key=lambda x: x["rrf_score"], reverse=True)[:limit]
+def rrf_score(rank, k=60):
+    return 1 / (k + rank)
 
 def hybrid_score(bm25_score, semantic_score, alpha=0.5):
     return alpha * bm25_score + (1 - alpha) * semantic_score
@@ -74,3 +101,8 @@ def weighted_search_command(query, alpha, limit):
     documents = load_movies()
     hybrid_search = HybridSearch(documents)
     return hybrid_search.weighted_search(query, alpha, limit)
+
+def rrf_search_command(query, k, limit):
+    documents = load_movies()
+    hybrid_search = HybridSearch(documents)
+    return hybrid_search.rrf_search(query, k, limit)
