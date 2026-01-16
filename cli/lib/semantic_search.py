@@ -270,6 +270,7 @@ class ChunkedSemanticSearch(SemanticSearch):
         if os.path.exists(CHUNK_EMBEDDINGS_PATH) and os.path.exists(
             CHUNK_METADATA_PATH
         ):
+            print("Loading chunk embeddings from cache")
             self.chunk_embeddings = np.load(CHUNK_EMBEDDINGS_PATH)
             with open(CHUNK_METADATA_PATH, "r") as f:
                 data = json.load(f)

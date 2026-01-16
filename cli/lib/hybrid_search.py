@@ -2,6 +2,7 @@ import os
 
 from .keyword_search import InvertedIndex
 from .semantic_search import ChunkedSemanticSearch
+from .search_utils import load_movies
 
 
 class HybridSearch:
@@ -20,10 +21,40 @@ class HybridSearch:
         return self.idx.bm25_search(query, limit)
 
     def weighted_search(self, query, alpha, limit=5):
-        raise NotImplementedError("Weighted hybrid search is not implemented yet.")
+        bm25_results = self._bm25_search(query, limit * 500)
+        bm25_scores = [result["score"] for result in bm25_results]
+        normalized_bm25_scores = normalize_scores(bm25_scores)
+        normalized_results = {
+            result["id"]: {
+                "bm25_score": score,
+                "document": result,
+            }
+            for result, score in zip(bm25_results, normalized_bm25_scores)
+        }
+        
+        
+        semantic_results = self.semantic_search.search_chunks(query, limit * 500)
+        semantic_scores = [result["score"] for result in semantic_results]
+        normalized_semantic_scores = normalize_scores(semantic_scores)
+        
+        for result, score in zip(semantic_results, normalized_semantic_scores):
+            if result['id'] not in normalized_results:
+                normalized_results[result["id"]] = result
+            normalized_results[result["id"]]["semantic_score"] = score
+
+        for _, result in normalized_results.items():
+            result["hybrid_score"] = hybrid_score(
+                result.get("bm25_score", 0.0), result.get("semantic_score", 0.0), alpha
+            )
+ 
+        return sorted(normalized_results.values(), key=lambda x: x["hybrid_score"], reverse=True)[:limit]
 
     def rrf_search(self, query, k, limit=10):
         raise NotImplementedError("RRF hybrid search is not implemented yet.")
+
+
+def hybrid_score(bm25_score, semantic_score, alpha=0.5):
+    return alpha * bm25_score + (1 - alpha) * semantic_score
 
 
 def normalize_scores(scores: list[float]) -> list[float]:
@@ -37,3 +68,9 @@ def normalize_scores(scores: list[float]) -> list[float]:
         return [1.0] * len(scores)
 
     return [(score - min_score) / (max_score - min_score) for score in scores]
+
+
+def weighted_search_command(query, alpha, limit):
+    documents = load_movies()
+    hybrid_search = HybridSearch(documents)
+    return hybrid_search.weighted_search(query, alpha, limit)
