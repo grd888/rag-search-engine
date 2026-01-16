@@ -118,7 +118,7 @@ def rrf_search_command(query: str, k: int, limit: int, enhance: Optional[str] = 
     enhanced_query = query
     if enhance:
         enhanced_query = enhance_query(query, method=enhance)
-
+    print(f"Enhanced query ({enhance}): '{query}' -> '{enhanced_query}'\n")
     results = hybrid_search.rrf_search(enhanced_query, k, limit)
     return {
         "results": results,
