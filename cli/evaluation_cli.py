@@ -28,9 +28,10 @@ def main():
         titles = [result["title"] for result in results]
         relevant_titles = [title for title in relevant_docs]
         precision_at_k = len(set(titles) & set(relevant_titles)) / limit
-        
+        recall_at_k = len(set(titles) & set(relevant_titles)) / len(relevant_titles)
         print(f"- Query: {query}")
         print(f"  - Precision@{limit}: {precision_at_k:.4f}")
+        print(f"  - Recall@{limit}: {recall_at_k:.4f}")
         print(f"  - Retrieved: {titles}")
         print(f"  - Relevant: {relevant_docs}")
         
