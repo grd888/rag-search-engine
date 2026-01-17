@@ -23,8 +23,8 @@ Documents:
 Provide a comprehensive answer that addresses the query:"""
     response = client.models.generate_content(model=model, contents=prompt)
     return response.text
- 
-  
+
+
 def summarize_results(query: str, results: list[dict]):
     prompt = f"""Provide information useful to this query by synthesizing information from multiple search results in detail.
 The goal is to provide comprehensive information so that users know what their options are.
@@ -38,6 +38,28 @@ Provide a comprehensive 3–4 sentence answer that combines information from mul
     response = client.models.generate_content(model=model, contents=prompt)
     return response.text
 
+def summarize_with_citations(query: str, documents: list[dict]):
+    prompt = f"""Answer the question or provide information based on the provided documents.
+
+This should be tailored to Hoopla users. Hoopla is a movie streaming service.
+
+If not enough information is available to give a good answer, say so but give as good of an answer as you can while citing the sources you have.
+
+Query: {query}
+
+Documents:
+{documents}
+
+Instructions:
+- Provide a comprehensive answer that addresses the query
+- Cite sources using [1], [2], etc. format when referencing information
+- If sources disagree, mention the different viewpoints
+- If the answer isn't in the documents, say "I don't have enough information"
+- Be direct and informative
+
+Answer:"""
+    response = client.models.generate_content(model=model, contents=prompt)
+    return response.text
 
 def rag_command(query: str) -> dict:
     movies = load_movies()
@@ -65,5 +87,19 @@ def summarize_command(query: str, limit: int = 5) -> dict:
         print(f"- {res['title']}")
     print()
     print("LLM Summary:")
+    print(summary)
+
+
+def citations_command(query: str, limit: int = 5) -> dict:
+    movies = load_movies()
+    hybrid_search = HybridSearch(movies)
+    search_results = hybrid_search.rrf_search(query, k=60, limit=limit)
+    docs = [f"{doc['title']} - {doc['document']}" for doc in search_results]
+    summary = summarize_with_citations(query, docs)
+    print("Search Results:")
+    for res in search_results:
+        print(f"- {res['title']}")
+    print()
+    print("LLM Answer:")
     print(summary)
     

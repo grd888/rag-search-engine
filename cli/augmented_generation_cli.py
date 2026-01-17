@@ -1,5 +1,5 @@
 import argparse
-from lib.generation import rag_command, summarize_command
+from lib.generation import rag_command, summarize_command, citations_command
 
 def main():
     parser = argparse.ArgumentParser(description="Retrieval Augmented Generation CLI")
@@ -14,6 +14,11 @@ def main():
     )
     summarize_parser.add_argument("query", type=str, help="Search query for RAG")
     summarize_parser.add_argument("--limit", type=int, default=5, help="Limit")
+    citations_parser = subparsers.add_parser(
+        "citations", help="Citations command"
+    )
+    citations_parser.add_argument("query", type=str, help="Search query with citations for RAG")
+    citations_parser.add_argument("--limit", type=int, default=5, help="Limit")
     args = parser.parse_args()
 
     match args.command:
@@ -24,6 +29,10 @@ def main():
             query = args.query
             limit = args.limit
             summarize_command(query, limit)
+        case "citations":
+            query = args.query
+            limit = args.limit
+            citations_command(query, limit)
         case _:
             parser.print_help()
 
