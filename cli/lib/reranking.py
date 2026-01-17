@@ -4,12 +4,27 @@ from time import sleep
 
 from dotenv import load_dotenv
 from google import genai
+from sentence_transformers import CrossEncoder
 
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key)
 model = "gemini-2.0-flash"
 
+def llm_rerank_cross_encoder(query: str, documents: list[dict], limit: int = 5) -> list[dict]:
+    if not documents:
+        return []
+    pairs = []
+    for doc in documents:
+        pairs.append([query, f"{doc.get('title', '')} - {doc.get('document', '')}"])
+    cross_encoder = CrossEncoder("cross-encoder/ms-marco-TinyBERT-L2-v2")
+    scores = cross_encoder.predict(pairs)
+
+    reranked = []
+    for i, score in enumerate(scores):
+        reranked.append({**documents[i], "cross_encoder_score": score})
+    reranked.sort(key=lambda x: x["cross_encoder_score"], reverse=True)
+    return reranked[:limit]
 
 def llm_rerank_batch(query: str, documents: list[dict], limit: int = 5) -> list[dict]:
     if not documents:
@@ -83,9 +98,12 @@ Score:"""
 def rerank(
     query: str, documents: list[dict], method: str = "batch", limit: int = 5
 ) -> list[dict]:
-    if method == "individual":
-        return llm_rerank_individual(query, documents, limit)
-    elif method == "batch":
-        return llm_rerank_batch(query, documents, limit)
-    else:
-        return documents[:limit]
+    match method:
+       case "individual":     
+            return llm_rerank_individual(query, documents, limit)
+       case "batch":
+            return llm_rerank_batch(query, documents, limit)
+       case "cross_encoder":
+            return llm_rerank_cross_encoder(query, documents, limit)
+       case _:
+            return documents[:limit]
