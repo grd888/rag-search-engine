@@ -61,6 +61,28 @@ Answer:"""
     response = client.models.generate_content(model=model, contents=prompt)
     return response.text
 
+def answer_question(question: str, context: list[dict]):
+    prompt = f"""Answer the user's question based on the provided movies that are available on Hoopla.
+
+This should be tailored to Hoopla users. Hoopla is a movie streaming service.
+
+Question: {question}
+
+Documents:
+{context}
+
+Instructions:
+- Answer questions directly and concisely
+- Be casual and conversational
+- Don't be cringe or hype-y
+- Talk like a normal person would in a chat conversation
+
+Answer:"""
+    response = client.models.generate_content(model=model, contents=prompt)
+    return response.text
+
+
+# Commands
 def rag_command(query: str) -> dict:
     movies = load_movies()
     hybrid_search = HybridSearch(movies)
@@ -102,4 +124,17 @@ def citations_command(query: str, limit: int = 5) -> dict:
     print()
     print("LLM Answer:")
     print(summary)
+    
+def question_answering_command(question: str, limit: int = 5) -> dict:
+    movies = load_movies()
+    hybrid_search = HybridSearch(movies)
+    search_results = hybrid_search.rrf_search(question, k=60, limit=limit)
+    docs = [f"{doc['title']} - {doc['document']}" for doc in search_results]
+    answer = answer_question(question=question, context=docs)
+    print("Search Results:")
+    for res in search_results:
+        print(f"- {res['title']}")
+    print()
+    print("Answer:")
+    print(answer)
     
