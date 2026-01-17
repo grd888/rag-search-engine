@@ -1,37 +1,20 @@
-import mimetypes
-from google import genai
-from dotenv import load_dotenv
-import os
-from google.genai.types import Part
+from PIL import Image
+from sentence_transformers import SentenceTransformer
 
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key)
-model = "gemini-2.0-flash"
+class MultiModalSearch:
+    def __init__(self, model_name="clip-ViT-B-32"):
+        self.image_model = SentenceTransformer("clip-ViT-B-32")
+        self.text_model = SentenceTransformer("all-MiniLM-L6-v2")
+        
+    def embed_image(self, image_path: str) -> list[float]:
+        image = Image.open(image_path)
+        return self.image_model.encode([image])[0]
 
 
-def describe_command(image: str, query: str) -> None:
-    print(f"Describing image: {image} with query: {query}")
-    mime, _ = mimetypes.guess_type(image)
-    mime = mime or "image/jpeg"
-
-    with open(image, "rb") as f:
-        data = f.read()
-
-    system_prompt = f"""
-    Analyze this image and rewrite the text query for better search results.
-    Image: {data}
-    Text Query: {query}
-    
-    - Combine visual and textual information
-    - Focus on movie-specific details (actors, plot, genre, etc.)
-    - Return only the rewritten query, without any additional commentary
-    """
-
-    parts = [system_prompt, Part.from_bytes(data=data, mime_type=mime), query.strip()]
-
-    response = client.models.generate_content(model=model, contents=parts)
-
-    print(f"Rewritten query: {response.text.strip()}")
-    if response.usage_metadata is not None:
-        print(f"Total tokens:    {response.usage_metadata.total_token_count}")
+def verify_image_embedding(image_path: str) -> None:
+    msm = MultiModalSearch()
+    embedding = msm.embed_image(image_path)
+    print(f"Embedding shape: {embedding.shape[0]} dimensions")
+    print(f"First 5 values: {embedding[:5]}")
+    print(f"Last 5 values: {embedding[-5:]}")
+    print(f"All values are finite: {all(map(lambda x: x == x, embedding))}")
