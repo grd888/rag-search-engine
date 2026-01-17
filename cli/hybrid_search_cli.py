@@ -4,6 +4,7 @@ from lib.hybrid_search import (
     weighted_search_command,
     rrf_search_command,
 )
+from lib.evaluation import llm_judge_results
 
 
 def main() -> None:
@@ -48,6 +49,11 @@ def main() -> None:
     )
     rrf_parser.add_argument(
         "--limit", type=int, default=5, help="Number of results to return (default=5)"
+    )
+    rrf_parser.add_argument(
+        "--evaluate",
+        action="store_true",
+        help="Use LLM to judge results",
     )
     args = parser.parse_args()
 
@@ -109,6 +115,12 @@ def main() -> None:
                 if ranks:
                     print(f"   {', '.join(ranks)}")
                 print(f"   {res['document'][:100]}...")
+                print()
+            if args.evaluate:
+                docs = result["results"]
+                scores = llm_judge_results(args.query, docs)
+                for i, score in enumerate(scores):
+                    print(f"{i + 1}. {docs[i]['title']}: {score}/3")
                 print()
         case _:
             parser.print_help()
