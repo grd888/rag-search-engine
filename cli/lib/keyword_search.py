@@ -74,7 +74,7 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
         doc_ids = idx.get_documents(term_token)
         for doc_id in doc_ids:
             if doc_id not in seen:
-                results.append(idx.doc_map[doc_id])
+                results.append(idx.docmap[doc_id])
                 seen.add(doc_id)
             if len(results) >= limit:
                 break
@@ -114,7 +114,7 @@ class InvertedIndex:
         # a mapping of tokens to document IDs
         self.index: defaultdict[str, set[int]] = defaultdict(set)
         # a mapping of document IDs to their full document objects
-        self.doc_map: dict[int, dict] = {}
+        self.docmap: dict[int, dict] = {}
         self.term_frequencies: defaultdict[int, Counter] = defaultdict(Counter)
         # a mapping of document IDs to their length (number of tokens)
         self.doc_lengths: defaultdict[int, int] = defaultdict(int)
@@ -163,7 +163,7 @@ class InvertedIndex:
         if len(tokens) != 1:
             raise ValueError("Input must be a single word/token")
         token = tokens[0]
-        total_doc_count = len(self.doc_map)
+        total_doc_count = len(self.docmap)
         term_match_doc_count = len(self.index[token])
         return math.log((total_doc_count + 1) / (term_match_doc_count + 1))
 
@@ -182,7 +182,7 @@ class InvertedIndex:
             raise ValueError("Input must be a single word/token")
         token = tokens[0]
         # N = total number of documents
-        N = len(self.doc_map)
+        N = len(self.docmap)
         # df = document frequency of term
         df = len(self.index[token])
         # bm25_idf = log((N - df + 0.5) / (df + 0.5) + 1)
@@ -210,36 +210,30 @@ class InvertedIndex:
         bm25_tf = self.get_bm25_tf(doc_id, term)
         return bm25_idf * bm25_tf
     
-    def bm25_search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[int]:
-        """
-        Search for documents using BM25.
-        """
-        tokens = tokenize_text(query)
-        # maps document id to total BM25 score
-        scores_dict: dict[int: int] = {}
-        for doc_id in self.doc_map:
+    def bm25_search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
+        query_tokens = tokenize_text(query)
+
+        scores = {}
+        for doc_id in self.docmap:
             score = 0.0
-            for token in tokens:
+            for token in query_tokens:
                 score += self.bm25(doc_id, token)
-            scores_dict[doc_id] = score
-        
-        # sort the documents by score in descending order
-        sorted_docs = sorted(scores_dict.items(), key=lambda x: x[1], reverse=True)
-        
+            scores[doc_id] = score
+
+        sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
         results = []
         for doc_id, score in sorted_docs[:limit]:
-            doc = self.doc_map[doc_id]
+            doc = self.docmap[doc_id]
             formatted_result = format_search_result(
                 doc_id=doc["id"],
                 title=doc["title"],
-                document = doc["description"],
-                score=score
+                document=doc["description"],
+                score=score,
             )
             results.append(formatted_result)
-        
-        return results
-        
 
+        return results
     def build(self) -> None:
         """
         Build the inverted index from the documents in the dataset.
@@ -248,7 +242,7 @@ class InvertedIndex:
         for movie in movies:
             # concatenate the title and description
             self.__add_document(movie["id"], f"{movie['title']} {movie['description']}")
-            self.doc_map[movie["id"]] = movie
+            self.docmap[movie["id"]] = movie
 
     def save(self) -> None:
         """
@@ -258,7 +252,7 @@ class InvertedIndex:
         with open(self.index_path, "wb") as f:
             pickle.dump(self.index, f)
         with open(self.docmap_path, "wb") as f:
-            pickle.dump(self.doc_map, f)
+            pickle.dump(self.docmap, f)
         with open(self.term_frequencies_path, "wb") as f:
             pickle.dump(self.term_frequencies, f)
         with open(self.doc_lengths_path, "wb") as f:
@@ -277,7 +271,7 @@ class InvertedIndex:
         with open(self.index_path, "rb") as f:
             self.index = pickle.load(f)
         with open(self.docmap_path, "rb") as f:
-            self.doc_map = pickle.load(f)
+            self.docmap = pickle.load(f)
         with open(self.term_frequencies_path, "rb") as f:
             self.term_frequencies = pickle.load(f)
         with open(self.doc_lengths_path, "rb") as f:
